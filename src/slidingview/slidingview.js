@@ -13,46 +13,59 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 document.addEventListener('touchmove', function (e) { e.preventDefault(); }, false);
 
 var SlidingView = function( sidebarId, bodyId ) {
-	
-	window.slidingView = this;
-	
 	this.gestureStarted = false;
 	this.bodyOffset = 0;
 	
 	this.sidebarWidth = 250;
 	
-	this.sidebar = $("#"+sidebarId);
-	this.body = $("#"+bodyId);
+	this.sidebar = $("#" + sidebarId);
+	this.body = $("#" + bodyId);
 	
 	this.sidebar.addClass( "slidingview_sidebar" );
 	this.body.addClass( "slidingview_body" );
+	
+	this._threshold = 50;
 		
 	var self = this;
 	$(window).resize( function(event){ self.resizeContent() } );
 	$(this.parent).resize( function(event){ self.resizeContent() } );
 	
-	if ( "onorientationchange" in window ) {
+	if ("onorientationchange" in window) {
 		$(window).bind( "onorientationchange", function(event){ self.resizeContent() } )
 	}
+	
 	this.resizeContent();
 	this.setupEventHandlers();
-}
+};
 
-SlidingView.prototype.setupEventHandlers = function() {
+SlidingView.prototype.threshold = function (val) {
+	if (val !== undefined) {
+		this._threshold = val;
+		return this;
+	}
+	
+	return this._threshold;
+};
 
-	this.touchSupported =  ('ontouchstart' in window);
+SlidingView.prototype.setupEventHandlers = function () {
+
+	this.touchSupported = ('ontouchstart' in window);
 	
 	this.START_EVENT = this.touchSupported ? 'touchstart' : 'mousedown';
 	this.MOVE_EVENT = this.touchSupported ? 'touchmove' : 'mousemove';
 	this.END_EVENT = this.touchSupported ? 'touchend' : 'mouseup';
 
 	var self = this;
-	var func = function( event ){ self.onTouchStart(event), true };
+	var func = function (event) {
+		event.preventDefault();
+		self.onTouchStart(event);
+	};
+	
 	var body = this.body.get()[0];
-	body.addEventListener( this.START_EVENT, func, false );
-}
+	body.addEventListener(this.START_EVENT, func, false);
+};
 
-SlidingView.prototype.onTouchStart = function(event) {
+SlidingView.prototype.onTouchStart = function (event) {
 	//console.log( event.type );
 	
 	this.gestureStartPosition = this.getTouchCoordinates( event );
@@ -64,50 +77,42 @@ SlidingView.prototype.onTouchStart = function(event) {
 	this.body.get()[0].addEventListener( this.MOVE_EVENT, this.touchMoveHandler, false );
 	this.body.get()[0].addEventListener( this.END_EVENT, this.touchUpHandler, false );
 	this.body.stop();
-}
+};
 
-SlidingView.prototype.onTouchMove = function(event) {
-	var currentPosition = this.getTouchCoordinates( event );
+SlidingView.prototype.onTouchMove = function (event) {
+	var currentPosition = this.getTouchCoordinates(event);
 	
 	if ( this.gestureStarted ) {
 		event.preventDefault();
 		event.stopPropagation();
-		this.updateBasedOnTouchPoints( currentPosition );
-		return;
-	}
-	else {
+		this.updateBasedOnTouchPoints(currentPosition);
+	} else {
 		//console.log( Math.abs( currentPosition.x - this.gestureStartPosition.x ) );
 		//detect the gesture
 		if ( Math.abs( currentPosition.y - this.gestureStartPosition.y ) > 50 ) {
 			
-			//dragging veritcally - ignore this gesture
+			//dragging vertically - ignore this gesture
 			this.unbindEvents();
-			return;
-		}
-		else if ( Math.abs( currentPosition.x - this.gestureStartPosition.x ) > 50 ) {
+		} else if ( Math.abs( currentPosition.x - this.gestureStartPosition.x ) > this._threshold ) {
 			
 			//dragging horizontally - let's handle this
 			this.gestureStarted = true;
 			event.preventDefault();
 			event.stopPropagation();
-			this.updateBasedOnTouchPoints( currentPosition );
-			return;
+			this.updateBasedOnTouchPoints(currentPosition);
 		}
 	}
-}
+};
 
-SlidingView.prototype.onTouchEnd = function(event) {
+SlidingView.prototype.onTouchEnd = function (event) {
 	if ( this.gestureStarted ) {
 		this.snapToPosition();
 	}
 	this.gestureStarted = false;
 	this.unbindEvents();
-}
+};
 
-
-
-SlidingView.prototype.updateBasedOnTouchPoints = function( currentPosition ) {
-	
+SlidingView.prototype.updateBasedOnTouchPoints = function (currentPosition) {
 	var deltaX = (currentPosition.x - this.gestureStartPosition.x);
 	var targetX = this.bodyOffset + deltaX;
 	
@@ -139,13 +144,12 @@ SlidingView.prototype.updateBasedOnTouchPoints = function( currentPosition ) {
 			}, 100);
 	}*/
 	
-	this.sidebar.trigger( "slidingViewProgress", { current: targetX, max:this.sidebarWidth } );
+	this.sidebar.trigger("slidingViewProgress", { current: targetX, max: this.sidebarWidth });
 	
 	this.gestureStartPosition = currentPosition;
-}
+};
 
-SlidingView.prototype.snapToPosition = function() {
-
+SlidingView.prototype.snapToPosition = function () {
 	//this.body.css("-webkit-transform", "translate3d(0,0,0)" );
 	this.body.css("left", "0px" );
 	var currentPosition = this.bodyOffset;
@@ -164,53 +168,50 @@ SlidingView.prototype.snapToPosition = function() {
 	if ( currentPosition != targetX ) {
 	    this.slideView(targetX);
 	}
-}
+};
 
-SlidingView.prototype.slideView = function(targetX) {
+SlidingView.prototype.slideView = function (targetX) {
     this.body.stop(true, false).animate({
-        left:targetX,
-        avoidTransforms:false,
+        left: targetX,
+        avoidTransforms: false,
         useTranslate3d: true
     }, 100);
 
-    this.sidebar.trigger( "slidingViewProgress", { current:targetX, max:this.sidebarWidth } );
-}
+    this.sidebar.trigger("slidingViewProgress", { current: targetX, max: this.sidebarWidth });
+};
 
-SlidingView.prototype.close = function() {
+SlidingView.prototype.close = function () {
     this.bodyOffset = 0;
     this.slideView(0);
 }
 
-SlidingView.prototype.open = function() {
+SlidingView.prototype.open = function () {
     if(this.bodyOffset == this.sidebarWidth) return;
     this.bodyOffset = this.sidebarWidth;
     this.slideView(this.sidebarWidth);
-}
+};
 
-SlidingView.prototype.unbindEvents = function() {
+SlidingView.prototype.unbindEvents = function () {
 	this.body.get()[0].removeEventListener( this.MOVE_EVENT, this.touchMoveHandler, false );
 	this.body.get()[0].removeEventListener( this.END_EVENT, this.touchUpHandler, false );
-}
+};
 
-
-
-SlidingView.prototype.getTouchCoordinates = function(event) {
+SlidingView.prototype.getTouchCoordinates = function (event) {
 	if ( this.touchSupported ) {
 		var touchEvent = event.touches[0];
-		return { x:touchEvent.pageX, y:touchEvent.pageY }
+		return { x: touchEvent.pageX, y: touchEvent.pageY }
 	}
 	else {
-		return { x:event.screenX, y:event.screenY };
+		return { x: event.screenX, y: event.screenY };
 	}
-}
+};
 
-SlidingView.prototype.resizeContent = function() {
-
-	var $window = $(window)
+SlidingView.prototype.resizeContent = function () {
+	var $window = $(window);
     var w = $window.width();
     var h = $window.height();
     
     this.body.width( w );
-}
+};
 
 	
